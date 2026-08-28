@@ -220,6 +220,10 @@
     .kanban{grid-template-columns:repeat(2,1fr)}
     .item .hd{flex-direction:column;gap:6px}
     .stats{grid-template-columns:repeat(2,1fr)}
+    .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .filters input[type=text]{grid-column:1 / -1;width:100%}
+    .filters select{grid-column:auto;width:100%;min-width:0}
+    .filters .fchk{grid-column:1 / -1;width:100%;margin-left:0;justify-content:flex-start}
   }
 
   /* === 全文检索高亮 === */
