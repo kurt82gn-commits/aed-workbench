@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache,no-store,must-revalidate">
+<meta name="format-detection" content="telephone=no">
+<title>正在打开 AED 标讯工作台…</title>
+<style>
+  html,body{height:100%}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+       background:#f4f6fb;color:#475569;display:flex;align-items:center;justify-content:center}
+  .m{padding:18px 24px;background:#fff;border:1px solid #e6eaf2;border-radius:16px;
+     box-shadow:0 4px 18px rgba(20,30,60,.08);font-size:15px;display:flex;align-items:center;gap:10px}
+  .spin{width:16px;height:16px;border:2px solid #c8d3ea;border-top-color:#2563eb;border-radius:50%;animation:s .7s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <div class="m"><span class="spin"></span>正在打开 AED 标讯工作台…</div>
+  <script>
+    (function(){
+      var base = "https://kurt82gn-commits.github.io/aed-workbench/";
+      // 运行时时间戳 → 每次 URL 唯一 → 微信 X5 缓存彻底失效，扫码永远是最新版
+      location.replace(base + "?v=" + Date.now());
+    })();
+  </script>
+</body>
+</html>
