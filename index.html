@@ -188,6 +188,20 @@
   .cc-lookups a{background:var(--bg);border:1px solid var(--brd);color:var(--pri);padding:6px 10px;border-radius:6px;font-size:11px;text-decoration:none;font-weight:600;min-height:32px;display:inline-flex;align-items:center}
   .cc-disclaimer{font-size:10px;color:#94a3b8;line-height:1.6;margin-top:8px;padding-top:7px;border-top:1px dashed var(--brd)}
 
+  /* === 销售核实回填（本组手工填写，本地暂存+导出合并） === */
+  .cc-person-mine{border-color:#86c9a0;background:#f4fbf6}
+  .badge-mine{background:#e3f2fd;color:#1565c0;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:700}
+  .cc-del{font-size:11px;color:#c0392b;cursor:pointer;text-decoration:underline;margin-top:5px;display:inline-block}
+  .cc-add-wrap{margin-top:8px}
+  .cc-add-btn{background:var(--pri);color:#fff;border:0;border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;min-height:38px;width:100%}
+  .cc-add-btn:hover{background:#1d4ed8}
+  .cc-add-form{background:var(--bg);border:1px solid var(--brd);border-radius:8px;padding:10px;margin-top:8px}
+  .af-in{width:100%;border:1px solid var(--line);border-radius:7px;padding:9px 11px;font-size:16px;margin-bottom:7px;min-height:42px;box-sizing:border-box;background:#fff;color:var(--ink)}
+  .af-save{background:#137333;color:#fff;border:0;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;min-height:40px}
+  .af-tip{display:block;font-size:11px;color:#8a6d3b;line-height:1.6;margin-top:7px}
+  .cc-export{background:#fff;border:1px solid var(--pri);color:var(--pri);border-radius:999px;padding:6px 13px;font-size:12px;cursor:pointer;font-weight:600;min-height:34px}
+  .cc-export:hover{background:var(--pri);color:#fff}
+
   /* === 品牌条 === */
   .brand-bars{margin-top:8px}
   .brand-row{display:flex;align-items:center;gap:10px;padding:6px 0}
@@ -434,7 +448,11 @@
 
   <section id="view-comp" class="view-sec" style="display:none">
     <div class="card">
-      <h2>竞品情报 <span class="ct">中标公司自动聚合 · 165 条已中标 · 120 家去重公司 · 点卡片看明细</span></h2>
+      <h2>竞品情报 <span class="ct">中标公司自动聚合 · 联系信息仅取自依法公开的企业信息</span></h2>
+      <div class="sub-bar" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span style="font-size:11px;color:#8a6d3b;line-height:1.6">业务员电话核实到对接人后，展开公司卡片点「＋ 添加核实联系人」；填完点右侧导出，交管理员合入后全组可见。</span>
+        <button class="cc-export" onclick="exportSalesContacts()">⬇ 导出回填数据（<span id="salesCnt">0</span>）</button>
+      </div>
       <div class="sub-bar">
         <span class="lab">筛选</span>
         <input id="compKw" type="search" placeholder="搜公司名 / 项目关键词" oninput="renderCompetitor()" style="flex:1;min-width:180px">
@@ -1112,17 +1130,19 @@
       '</div></div>';
   }
   // 展开区：工商信息 + 热线 + 多人多号 + 来源追溯 + 查证入口
-  function renderContactDetail(name){
+  function renderContactDetail(name, idx){
     var ci = compInfo(name);
     var links = (ci && ci["查证链接"]) || {};
     var lk = Object.keys(links).map(function(k){
       return '<a href="'+esc(links[k])+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">'+esc(k)+' ↗</a>';
     }).join("");
+    var mine = renderSalesContacts(name, ci);
+    var form = renderAddForm(name, idx);
     if(!ci || !ci["已富集"]){
       return '<div class="cc-contact"><div class="cc-pending">'+
         '<b>公开联系信息待补充</b><br>该公司尚未核实到公开联系信息。点击下方可跳转查证，'+
         '回填时请仅采用工商年报、企业官网、政府备案/采购公示等依法公开来源。'+
-        '</div>'+(lk?'<div class="cc-lookups">'+lk+'</div>':'')+'</div>';
+        '</div>'+(lk?'<div class="cc-lookups">'+lk+'</div>':'')+mine+form+'</div>';
     }
     var gs = ci["工商信息"]||{}, hot = ci["客服热线"]||{};
     var h = '<div class="cc-contact"><div class="cc-ct-title">企业公开联系信息</div>';
@@ -1140,7 +1160,8 @@
            (hot["用途"]?'<span class="use">'+esc(hot["用途"])+'</span>':'')+'</div>';
     }
     (ci["联系人"]||[]).forEach(function(p){
-      h += '<div class="cc-person">';
+      var isMine = !!p["用户提交"];
+      h += '<div class="cc-person'+(isMine?' cc-person-mine':'')+'">';
       h += '<div class="cc-p-top"><span class="cc-p-name">'+esc(p["姓名"]||"")+'</span>'+
            '<span class="cc-p-role">'+esc(p["职务"]||"")+'</span></div>';
       var ph = p["电话"]||[];
@@ -1150,8 +1171,14 @@
         }).join("")+'</div>';
       }
       if(p["邮箱"]) h += '<div class="cc-p-mail">✉ '+esc(p["邮箱"])+'</div>';
-      h += '<div class="cc-src">来源：'+esc(p["来源"]||"")+' · '+
-           (p["核实"]?'<b style="color:#137333">已核实</b>':'待复核')+'</div>';
+      if(isMine){
+        h += '<div class="cc-src"><span class="badge-mine">本组核实</span> · '+esc(p["来源"]||"")+
+             (p["添加人"]?' · '+esc(p["添加人"]):'')+
+             (p["添加时间"]?' · '+esc(p["添加时间"]):'')+'</div>';
+      }else{
+        h += '<div class="cc-src">来源：'+esc(p["来源"]||"")+' · '+
+             (p["核实"]?'<b style="color:#137333">已核实</b>':'待复核')+'</div>';
+      }
       h += '</div>';
     });
     var hist = ci["历史披露电话"]||[];
@@ -1163,8 +1190,24 @@
     h += '<div class="cc-disclaimer">以上均为依法公开的企业信息（工商年报、企业官网公布、'+
          '政府备案及采购公示）。拜访前请先致电确认对接人；请勿转作他用。</div>';
     if(ci["更新时间"]) h += '<div class="cc-src">数据更新：'+esc(ci["更新时间"])+'</div>';
+    h += mine + form;
     h += '</div>';
     return h;
+  }
+  function renderAddForm(name, idx){
+    return '<div class="cc-add-wrap">'+
+      '<button class="cc-add-btn" onclick="event.stopPropagation();toggleAddForm(\''+idx+'\')">＋ 添加核实联系人</button>'+
+      '<div class="cc-add-form" id="af_'+idx+'" data-comp="'+esc(name)+'" style="display:none" onclick="event.stopPropagation()">'+
+        '<input class="af-in" id="afn_'+idx+'" placeholder="姓名（必填）">'+
+        '<input class="af-in" id="afr_'+idx+'" placeholder="职务，如 销售总监">'+
+        '<input class="af-in" id="afp_'+idx+'" placeholder="电话（必填，多个用逗号分隔）">'+
+        '<input class="af-in" id="afe_'+idx+'" placeholder="邮箱（选填）">'+
+        '<input class="af-in" id="afs_'+idx+'" value="电话核实" placeholder="来源">'+
+        '<input class="af-in" id="afu_'+idx+'" placeholder="你的名字（选填）">'+
+        '<button class="af-save" onclick="event.stopPropagation();submitAddContact(\''+idx+'\')">保存到本组库</button>'+
+        '<span class="af-tip">仅填写你本人电话核实过的对接人，勿填网上搜集的号码。'+
+        '保存后点本页顶部「导出回填数据」发给管理员，合入后全组可见。</span>'+
+      '</div></div>';
   }
   function renderCompetitor(){
     var box=$("compGrid"); if(!box) return;
@@ -1222,7 +1265,7 @@
         renderContactStrip(c.name)+
       '</div>'+
       '<div class="cc-detail" id="cd_'+idx+'">'+
-        renderContactDetail(c.name)+
+        renderContactDetail(c.name, idx)+
         c.items.sort(function(a,b){return new Date(b["发布日期"]||0)-new Date(a["发布日期"]||0);}).map(function(r){
           return '<div class="cc-row"><div class="r-title">'+esc(r["标题"]||"")+'</div><div class="r-meta">'+esc(r["地区"]||"")+' · '+esc(r["采购人"]||"")+' · '+esc(r["采购方式"]||"")+' · 发布 '+esc(r["发布日期"]||"")+(r["中标金额"]!=null?' · 中标 '+fmtMoney(r["中标金额"]):'')+'</div></div>';
         }).join("")+
@@ -1237,12 +1280,110 @@
         if(d){var open = d.classList.toggle("open"); card.classList.toggle("open", open);}
       };
     });
+    // 绑定"删除本组核实联系人"
+    Array.from(box.querySelectorAll(".cc-del")).forEach(function(el){
+      el.onclick = function(ev){
+        ev.stopPropagation();
+        var c = el.getAttribute("data-comp"), i = parseInt(el.getAttribute("data-i"),10);
+        if(confirm("删除这条本组核实联系人？")){ delSalesContact(c,i); renderCompetitor(); }
+      };
+    });
     // 排序按钮高亮
     [["won","compSortWon"],["amt","compSortAmt"],["contact","compSortContact"]].forEach(function(p){
       var el=$(p[1]); if(el) el.classList.toggle("on", compSort===p[0]);
     });
-    // 更新 tab 角标
+    // 更新 tab 角标与本机待合并计数
     var b = $("badgeComp"); if(b) b.textContent = arr.length;
+    var sc = $("salesCnt"); if(sc) sc.textContent = countSalesContacts();
+  }
+
+  /* ---- 销售核实回填：本组手工填写，本地暂存 + 导出合并 ----
+     只收录业务员本人实际沟通核实过的对接人；不经任何网络抓取，不采集网上流传的号码。 */
+  var LS_SALES = "aedSalesContacts_v1";
+  function loadSalesContacts(){
+    try{ return JSON.parse(localStorage.getItem(LS_SALES)||"{}"); }catch(e){ return {}; }
+  }
+  function saveSalesContacts(o){
+    try{ localStorage.setItem(LS_SALES, JSON.stringify(o)); }catch(e){}
+  }
+  function addSalesContact(comp, c){
+    var o=loadSalesContacts(); if(!o[comp]) o[comp]=[]; o[comp].push(c); saveSalesContacts(o);
+  }
+  function delSalesContact(comp, i){
+    var o=loadSalesContacts();
+    if(o[comp]){ o[comp].splice(i,1); if(!o[comp].length) delete o[comp]; saveSalesContacts(o); }
+  }
+  function countSalesContacts(){
+    var o=loadSalesContacts(), n=0;
+    Object.keys(o).forEach(function(k){ n+=(o[k]||[]).length; });
+    return n;
+  }
+  function toggleAddForm(idx){
+    var el=$("af_"+idx); if(!el) return;
+    el.style.display = (el.style.display==="block") ? "none" : "block";
+  }
+  function submitAddContact(idx){
+    var form=$("af_"+idx); if(!form) return;
+    var comp = form.getAttribute("data-comp")||"";
+    var n=($("afn_"+idx).value||"").trim();
+    var p=($("afp_"+idx).value||"").trim();
+    if(!n){ alert("请填写姓名"); return; }
+    if(!p){ alert("请填写电话"); return; }
+    var phones = p.split(/[,，、;；\s]+/).filter(function(x){return x;});
+    addSalesContact(comp, {
+      "姓名": n,
+      "职务": ($("afr_"+idx).value||"").trim(),
+      "电话": phones,
+      "邮箱": ($("afe_"+idx).value||"").trim(),
+      "来源": ($("afs_"+idx).value||"").trim() || "电话核实",
+      "添加人": ($("afu_"+idx).value||"").trim(),
+      "添加时间": new Date().toISOString().slice(0,10),
+      "核实": true,
+      "用户提交": true
+    });
+    renderCompetitor();
+  }
+  function exportSalesContacts(){
+    var o=loadSalesContacts(), keys=Object.keys(o);
+    if(!keys.length){ alert("还没有添加任何核实联系人"); return; }
+    var payload={"_类型":"销售核实回填","_导出时间":new Date().toISOString(),
+      "_说明":"由销售人员在工作台手工填写并经实际沟通核实。放入 sales_inbox/ 目录后，下次构建自动合并并发布给全组。",
+      "公司":{}};
+    keys.forEach(function(k){ payload["公司"][k]={"联系人":o[k]}; });
+    var blob=new Blob([JSON.stringify(payload,null,1)],{type:"application/json"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="aed_contacts_inbox_"+new Date().toISOString().slice(0,10).replace(/-/g,"")+".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },1000);
+  }
+  function renderSalesContacts(name, ci){
+    var o=loadSalesContacts(), arr=o[name]||[];
+    if(!arr.length) return "";
+    // 已合并进发布数据的不再重复展示，避免同一条出现两次
+    var key=function(p){return (p["姓名"]||"")+"|"+((p["电话"]||[]).join(","));};
+    var mk={};
+    ((ci&&ci["联系人"])||[]).forEach(function(p){ if(p["用户提交"]) mk[key(p)]=1; });
+    arr=arr.filter(function(p){ return !mk[key(p)]; });
+    if(!arr.length) return "";
+    var h='<div class="cc-ct-title" style="margin-top:10px">本组核实联系人（本机待合并 '+arr.length+'）</div>';
+    arr.forEach(function(p,i){
+      h+='<div class="cc-person cc-person-mine">';
+      h+='<div class="cc-p-top"><span class="cc-p-name">'+esc(p["姓名"]||"")+'</span>'+
+         '<span class="cc-p-role">'+esc(p["职务"]||"")+'</span></div>';
+      var ph=p["电话"]||[];
+      if(ph.length){
+        h+='<div class="cc-phones">'+ph.map(function(t){return '<a '+telHref(t)+'>☎ '+esc(t)+'</a>';}).join("")+'</div>';
+      }
+      if(p["邮箱"]) h+='<div class="cc-p-mail">✉ '+esc(p["邮箱"])+'</div>';
+      h+='<div class="cc-src">'+esc(p["来源"]||"")+
+         (p["添加人"]?' · '+esc(p["添加人"]):'')+
+         (p["添加时间"]?' · '+esc(p["添加时间"]):'')+
+         ' · <span class="badge-mine">本组核实</span></div>';
+      h+='<span class="cc-del" data-comp="'+esc(name)+'" data-i="'+i+'">删除</span>';
+      h+='</div>';
+    });
+    return h;
   }
 
   /* ================== 数据洞察 ================== */
@@ -2076,6 +2217,8 @@
   window.saveProfile=saveProfile;window.clearProfile=clearProfile;
   window.renderCompetitor=renderCompetitor;window.renderInsight=renderInsight;
   window.toggleCompSort=toggleCompSort;window.clearCompSort=clearCompSort;
+  window.toggleAddForm=toggleAddForm;window.submitAddContact=submitAddContact;
+  window.exportSalesContacts=exportSalesContacts;window.delSalesContact=delSalesContact;
   window.scoreMatch=scoreMatch;
   window.toggleCase=toggleCase;window.renderCases=renderCases;window.exportCases=exportCases;window.clearAllCases=clearAllCases;
   window.openAI=openAI;window.closeAI=closeAI;
